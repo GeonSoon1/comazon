@@ -1,0 +1,29 @@
+###
+GET http://localhost:3000/products
+###
+
+GET http://localhost:3000/products/8be3d6e4-ab09-409b-8bc9-c3d1c05f8403
+
+###
+
+POST http://localhost:3000/products
+Content-Type: application/json
+
+{
+  "name" : "패딩",
+  "category" : "FASHION",
+  "description" : "신상 패딩",
+  "price" : 200000,
+  "stock" : 136
+}
+
+###
+PATCH http://localhost:3000/products/9ad8abb7-9400-4e9d-acb3-c341239e6e0a
+Content-Type: application/json
+
+{
+  "name" : "점퍼"
+}
+
+### 
+DELETE http://localhost:3000/products/dcdf3c69-e304-482b-9a34-76d8600c9d2c
