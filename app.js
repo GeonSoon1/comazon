@@ -56,14 +56,13 @@ app.delete("/users/:id", async (req, res) => {
 // product
 app.get("/products" , async (req, res) => {
   const products = await prisma.product.findMany()
-  console.log(products)
   res.send(products)
 })
 
 app.get("/products/:id", async (req, res) => {
   const { id } = req.params
   const product = await prisma.product.findUnique({
-    where: {id}
+    where: { id }
   })
   if (product) {
     res.send(product)
@@ -77,11 +76,11 @@ app.post("/products", async (req, res) => {
   const product = await prisma.product.create({
     data
   })
-  res.send(product)
+  res.status(201).send(product)
 })
 
 app.patch("/products/:id", async (req, res) => {
-  const { id } = req.params
+  const { id } = req.params;
   const data = req.body;
 
   const product = await prisma.product.update({
