@@ -23,6 +23,7 @@ model User {
   updatedAt      DateTime        @updatedAt
   userPreference UserPreference?
   orders         Order[]
+  savedItems     Product[]
 }
 
 model UserPreference {
@@ -35,15 +36,16 @@ model UserPreference {
 }
 
 model Product {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  category    Category
-  price       Float
-  stock       Int
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
+  id           String      @id @default(uuid())
+  name         String
+  description  String?
+  category     Category
+  price        Float
+  stock        Int
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  orderItems   OrderItem[]
+  savedUsers   User[]
 }
 
 model Order {

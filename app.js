@@ -1,9 +1,12 @@
 import express from 'express'
 import { Prisma, PrismaClient } from '@prisma/client';
 import { assert } from 'superstruct'
-import { CreateOrder, CreateProduct, CreateUser, PatchOrder, PatchProduct, PatchUser } from './struct.js';
+import { CreateOrder, CreateProduct, CreateUser, PatchOrder, PatchProduct, PatchUser, SaveProduct } from './struct.js';
+import { PORT } from './constants.js'
+import cors from 'cors'
 
 const app = express();
+app.use(cors())
 app.use(express.json());
 
 const prisma = new PrismaClient()
@@ -117,6 +120,29 @@ app.delete("/users/:id", asyncHandler(async (req, res) => {
   })
   res.send(user)
 }))
+
+app.post("/users/:id/save", asyncHandler(async (req, res) => {
+  assert(req.body, SaveProduct)
+  const { id: userId } = req.params
+  const { productId } = req.body;
+  const data = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      savedItems: {
+        connect: {
+          id: productId
+        }
+      }
+    },
+    include: {
+      savedItems : true
+    }
+  })
+  res.status(201).send(data)
+})
+)
+
+
 
 
 //////////////////// product /////////////////////////
@@ -292,4 +318,5 @@ app.delete("/orders/:id", asyncHandler(async( req, res) => {
 }))
 
 
-app.listen(process.env.PORT || 3000, () => console.log("Server Started"))
+app.listen(PORT || 3000, () => console.log("Server Started"))
+
