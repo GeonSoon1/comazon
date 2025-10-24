@@ -25,6 +25,11 @@ const CATEGORIES = [
   'HOUSEHOLD_SUPPLIES'
 ]
 
+const ORDER_STATUS = [
+  "PENDING",
+  "COMPLETE"
+]
+
 export const CreateProduct = s.object({
   name: s.size(s.string(), 1, 60),
   description: s.string(),
@@ -36,6 +41,7 @@ export const CreateProduct = s.object({
 
 export const PatchProduct = s.partial(CreateProduct)
 
+
 export const CreateOrder = s.object({
   userId: s.define("Uuid", (value) => isUuid.v4(value)),
   orderItems: s.array(
@@ -45,4 +51,9 @@ export const CreateOrder = s.object({
       quantity: s.min(s.integer(), 1),
     })
   )
+})
+
+
+export const PatchOrder = s.object({
+  status: s.enums(ORDER_STATUS)
 })

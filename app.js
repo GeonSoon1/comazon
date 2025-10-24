@@ -1,7 +1,7 @@
 import express from 'express'
 import { Prisma, PrismaClient } from '@prisma/client';
 import { assert } from 'superstruct'
-import { CreateOrder, CreateProduct, CreateUser, PatchProduct, PatchUser } from './struct.js';
+import { CreateOrder, CreateProduct, CreateUser, PatchOrder, PatchProduct, PatchUser } from './struct.js';
 
 const app = express();
 app.use(express.json());
@@ -15,7 +15,7 @@ function asyncHandler(handler) {
     } catch (e) {
       console.error(e);
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-        res.senStatus(404);
+        res.sendStatus(404);
       } else if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         res.status(400).send({ message: "email이 중복됐습니다."})
       } else if (e.name === "StructError") {
@@ -28,8 +28,7 @@ function asyncHandler(handler) {
   }
 }
 
-
-// users
+//////////////////// user /////////////////////////
 app.post("/users", asyncHandler(async (req, res) => {
   assert(req.body, CreateUser);
   const { userPreference, ...userFields } = req.body;
@@ -49,8 +48,7 @@ app.post("/users", asyncHandler(async (req, res) => {
   res.status(201).send(user);
 }));
 
-
-app.get("/users", async (req, res) => {
+app.get("/users", asyncHandler(async (req, res) => {
   const { offset=0, limit=0, order="newest" } = req.query
   let orderBy;
   switch (order) {
@@ -72,11 +70,11 @@ app.get("/users", async (req, res) => {
     }
   })
   res.send(users)
-})
+}))
 
 app.get("/users/:id", asyncHandler(async (req, res) => {
   const id = req.params.id
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findUniqueOrThrow({
     where: { id },
     include: {
       userPreference:true
@@ -90,7 +88,7 @@ app.get("/users/:id", asyncHandler(async (req, res) => {
 }))
 
 
-app.patch("/users/:id", async (req, res) => {
+app.patch("/users/:id", asyncHandler(async (req, res) => {
   const { id }= req.params;
   assert(req.body, PatchUser)
   const { userPreference, ...userFields } = req.body;
@@ -109,30 +107,30 @@ app.patch("/users/:id", async (req, res) => {
     }
   })
   res.send(user)
-})
+}))
 
-app.delete("/users/:id", async (req, res) => {
+
+app.delete("/users/:id", asyncHandler(async (req, res) => {
   const id = req.params.id;
   const user = await prisma.user.delete({
     where : { id } 
   })
   res.send(user)
-})
+}))
 
 
-
-// product
-app.post("/products", async (req, res) => {
+//////////////////// product /////////////////////////
+app.post("/products", asyncHandler(async (req, res) => {
   const data = req.body;
   assert(data, CreateProduct)
   const product = await prisma.product.create({
     data
   })
   res.status(201).send(product)
-})
+}))
 
 
-app.get("/products", async (req, res) => {
+app.get("/products", asyncHandler(async (req, res) => {
   const { offset=0, limit=0, order="newest", category } = req.query
   let orderBy;
   switch (order) {
@@ -159,11 +157,12 @@ app.get("/products", async (req, res) => {
     take: parseInt(limit)
   })
   res.send(products)
-})
+}))
 
-app.get("/products/:id", async (req, res) => {
+
+app.get("/products/:id", asyncHandler(async (req, res) => {
   const { id } = req.params
-  const product = await prisma.product.findUnique({
+  const product = await prisma.product.findUniqueOrThrow({
     where: { id }
   })
   if (product) {
@@ -171,9 +170,9 @@ app.get("/products/:id", async (req, res) => {
   } else {
     res.status(404).send({message: "Cannot find given id"})
   }
-})
+}))
 
-app.patch("/products/:id", async (req, res) => {
+app.patch("/products/:id", asyncHandler(async (req, res) => {
   const { id } = req.params;
   const data = req.body;
   assert(data, PatchProduct)
@@ -182,23 +181,46 @@ app.patch("/products/:id", async (req, res) => {
     data
   })
   res.send(product)
-})
+}))
 
-app.delete("/products/:id", async (req, res) => {
+app.delete("/products/:id", asyncHandler(async (req, res) => {
   const { id } = req.params
   const product = await prisma.product.delete({
     where: {id}
   })
-  res.send(product)
-})
+  res.status(204).send(product)
+}))
 
-// Orders
-app.get("/orders", async (req, res) => {
+
+
+
+//////////////////// order /////////////////////////
+app.get("/orders", asyncHandler(async (req, res) => {
   const data = await prisma.order.findMany()
   res.send(data)
-});
+}));
 
-app.post("/orders", async (req, res) => {
+app.get("/orders/:id", asyncHandler(async(req, res) => {
+  const { id } = req.params
+  const order = await prisma.order.findUniqueOrThrow({
+    where: { id },
+    include: {
+      orderItems: {
+        include: {
+          product: true
+        }
+      }
+    }
+  })
+  let total = 0;
+  order.orderItems.forEach((orderItem) => {
+    total += orderItem.unitPrice * orderItem.quantity
+  })
+  order.total = total;
+  res.send(order)
+}))
+
+app.post("/orders", asyncHandler(async (req, res) => {
   assert(req.body, CreateOrder);
   const { orderItems, ...orderProperties } = req.body;
   const productIds = orderItems.map((orderItem) => orderItem.productId);
@@ -247,7 +269,27 @@ app.post("/orders", async (req, res) => {
   ]);
 
   res.send(order)
-});
+}));
+
+app.patch("/orders/:id", asyncHandler(async(req, res) => {
+  assert(req.body, PatchOrder)
+  const { id } = req.params
+  const { status } = req.body
+
+  const order = await prisma.order.update({
+    where: {id},
+    data: { status }
+  })
+  res.send(order)
+}))
+
+app.delete("/orders/:id", asyncHandler(async( req, res) => {
+  const { id } = req.params
+  await prisma.order.delete({
+    where: { id }
+  })
+  res.sendStatus(204)
+}))
 
 
 app.listen(process.env.PORT || 3000, () => console.log("Server Started"))
