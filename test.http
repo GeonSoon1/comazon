@@ -1,0 +1,17 @@
+
+GET http://localhost:3000/products?offset=0&limit=3&order=priceHighest&category=FASHION
+
+POST http://localhost:3000/orders 
+Content-Type: application/json
+
+{
+  "userId" :"",
+  "orderItems" : [
+    {
+      ""
+    },
+    {
+      ""
+    }
+  ]
+}

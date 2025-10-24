@@ -1,5 +1,7 @@
 import * as s from 'superstruct'
+import isUuid from 'is-uuid'
 import isEmail from 'is-email'
+
 
 export const CreateUser = s.object({
   email: s.define("Email", isEmail),
@@ -7,7 +9,7 @@ export const CreateUser = s.object({
   lastName: s.size(s.string(), 1, 30),
   address: s.string(),
   userPreference: s.object({
-    receiveEmail: s.boolean(),
+    receiveEmail: s.boolean()
   })
 })
 
@@ -31,4 +33,16 @@ export const CreateProduct = s.object({
   stock: s.min(s.integer(), 0),
 })
 
+
 export const PatchProduct = s.partial(CreateProduct)
+
+export const CreateOrder = s.object({
+  userId: s.define("Uuid", (value) => isUuid.v4(value)),
+  orderItems: s.array(
+    s.object({
+      productId: s.define("Uuid", (value) => isUuid.v4(value)),
+      unitPrice: s.min(s.number(), 0),
+      quantity: s.min(s.integer(), 1),
+    })
+  )
+})

@@ -11,10 +11,10 @@ async function main() {
     data: USERS,
     skipDuplicates: true
   })
-  await prisma.product.createMany(({
+  await prisma.product.createMany({
     data: PRODUCTS,
     skipDuplicates: true
-  }))
+  })
 }
 
 main()

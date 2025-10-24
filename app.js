@@ -1,15 +1,36 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { assert } from 'superstruct'
-import { CreateProduct, CreateUser, PatchProduct, PatchUser } from './struct.js';
+import { CreateOrder, CreateProduct, CreateUser, PatchProduct, PatchUser } from './struct.js';
 
 const app = express();
 app.use(express.json());
 
 const prisma = new PrismaClient()
 
+function asyncHandler(handler) {
+  return async function (req, res) {
+    try {
+      await handler(req, res)
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+        res.senStatus(404);
+      } else if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        res.status(400).send({ message: "email이 중복됐습니다."})
+      } else if (e.name === "StructError") {
+        res.status(400).send({message: "StructError 입니다."})
+      } 
+      else {
+        res.status(500).send({message: e.message})
+      }
+    }
+  }
+}
+
+
 // users
-app.post("/users", async (req, res) => {
+app.post("/users", asyncHandler(async (req, res) => {
   assert(req.body, CreateUser);
   const { userPreference, ...userFields } = req.body;
   const user = await prisma.user.create({
@@ -22,11 +43,11 @@ app.post("/users", async (req, res) => {
       }
     },
     include: {
-      userPreference: true
+      userPreference:true
     }
-  })
-  res.status(201).send(user)
-})
+  });
+  res.status(201).send(user);
+}));
 
 
 app.get("/users", async (req, res) => {
@@ -53,26 +74,39 @@ app.get("/users", async (req, res) => {
   res.send(users)
 })
 
-app.get("/users/:id", async (req, res) => {
+app.get("/users/:id", asyncHandler(async (req, res) => {
   const id = req.params.id
   const user = await prisma.user.findUnique({
-    where: { id } 
+    where: { id },
+    include: {
+      userPreference:true
+    } 
   })
   if (user) {
     res.send(user);
   } else {
     res.status(404).send({message: "Cannot find given id"})
   }
-})
+}))
 
 
 app.patch("/users/:id", async (req, res) => {
   const { id }= req.params;
-  const data = req.body;
-  assert(data, PatchUser)
+  assert(req.body, PatchUser)
+  const { userPreference, ...userFields } = req.body;
   const user = await prisma.user.update({
     where: { id },
-    data
+    data : {
+      ...userFields,
+      userPreference: {
+        update: {
+          receiveEmail: true
+        }
+      }
+    },
+    include: {
+      userPreference:true
+    }
   })
   res.send(user)
 })
@@ -86,8 +120,8 @@ app.delete("/users/:id", async (req, res) => {
 })
 
 
-// product
 
+// product
 app.post("/products", async (req, res) => {
   const data = req.body;
   assert(data, CreateProduct)
@@ -157,5 +191,63 @@ app.delete("/products/:id", async (req, res) => {
   })
   res.send(product)
 })
+
+// Orders
+app.get("/orders", async (req, res) => {
+  const data = await prisma.order.findMany()
+  res.send(data)
+});
+
+app.post("/orders", async (req, res) => {
+  assert(req.body, CreateOrder);
+  const { orderItems, ...orderProperties } = req.body;
+  const productIds = orderItems.map((orderItem) => orderItem.productId);
+
+  function getQuantity(productId) {
+    const orderItem = orderItems.find((orderItem) => orderItem.productId = productId)
+    return orderItem.quantity;
+  }
+
+  //재고가 충분한가?
+  const products = await prisma.product.findMany({
+    where: {id :{ in : productIds } }
+  })
+  const isSufficientStock = products.every((product) => {
+    const { id, stock } = product;
+    return stock >= getQuantity(id)
+  })
+
+  if (!isSufficientStock) {
+    return res.status(500).send({message: "Insufficient Stock"})
+  }
+
+  // 트랜잭션 
+  const queries = productIds.map((id) => {
+    return prisma.product.update({
+      where: { id },
+      data: { stock: {decrement: getQuantity(id)}}
+    })
+  })
+  
+  const [order] = await prisma.$transaction([
+    prisma.order.create({
+      data: {
+        user: {
+          connect: { id: orderProperties.userId}
+        },
+        orderItems: {
+          create: orderItems
+        },
+      },
+      include: {
+        orderItems: true,
+      }
+    }),
+    ...queries
+  ]);
+
+  res.send(order)
+});
+
 
 app.listen(process.env.PORT || 3000, () => console.log("Server Started"))
